@@ -1,5 +1,5 @@
 name: 'LocalHero AI Translation'
-description: 'Automatic AI-powered translations for your i18n files using Localhero.ai.'
+description: 'AI i18n translation on every PR. Works with react-i18next, LinguiJS, Rails (YAML), and Django (.po).'
 author: 'Localhero.ai'
 branding:
   icon: 'globe'
@@ -107,7 +107,7 @@ runs:
         BASE_REF: ${{ github.base_ref }}
         REPO: ${{ github.repository }}
       run: |
-        git fetch --no-tags --depth=20 \
+        git fetch --no-tags \
           "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}" \
           "${BASE_REF}:${BASE_REF}"
 

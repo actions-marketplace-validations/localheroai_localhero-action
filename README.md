@@ -1,8 +1,10 @@
-# LocalHero GitHub Action 🌍
+# Localhero GitHub Action 🌍
 
-> Automatic localization for teams that ship
+> AI translation that runs in CI, on every pull request
 
-The official GitHub Action for [LocalHero.ai](https://localhero.ai) - AI-powered i18n translations that integrate seamlessly with your development workflow. [Start your free trial](https://localhero.ai) to get automatic translations in your PRs.
+The official GitHub Action for [Localhero.ai](https://localhero.ai). It translates the i18n keys that changed in a PR and commits them back to the same PR, so translations stop holding up releases. It knows your glossary and brand terms, preserves ICU placeholders and plural forms, and gives your team a review UI instead of a YAML diff.
+
+Works with the common code-native i18n setups: **react-i18next**, **LinguiJS**, **Rails i18n** (YAML), and **Django / gettext** (`.po`), plus JSON and YAML locale files generally. [Start your free trial](https://localhero.ai) to get automatic translations in your PRs.
 
 ## Quick Start 🚀
 
@@ -19,7 +21,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: translate-${{ github.head_ref || github.run_id }}
+  group: translate-${{ github.event.client_payload.branch || github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -30,12 +32,14 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.client_payload.branch || github.head_ref }}
+          ref: ${{ github.event.client_payload.branch || github.head_ref || github.ref_name }}
           fetch-depth: 0
 
-      - uses: localheroai/action@v1
+      - name: Translate
+        uses: localheroai/localhero-action@v1
         with:
           api-key: ${{ secrets.LOCALHERO_API_KEY }}
 ```
@@ -61,7 +65,7 @@ That's it! The action will automatically:
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `api-key` | Yes | - | Your LocalHero API key |
+| `api-key` | Yes | - | Your Localhero.ai API key |
 | `command` | No | `ci` | CLI command: `ci`, `translate`, `push`, `pull` |
 | `verbose` | No | `false` | Show detailed output |
 | `cli-version` | No | `latest` | Pin CLI version (e.g., `1.2.3`) |
@@ -81,7 +85,7 @@ That's it! The action will automatically:
 The simplest setup uses the `ci` command which auto-detects your context:
 
 ```yaml
-- uses: localheroai/action@v1
+- uses: localheroai/localhero-action@v1
   with:
     api-key: ${{ secrets.LOCALHERO_API_KEY }}
 ```
@@ -99,9 +103,10 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.client_payload.branch || github.head_ref }}
+          ref: ${{ github.event.client_payload.branch || github.head_ref || github.ref_name }}
           fetch-depth: 0
 
       # Extract messages (project-specific)
@@ -110,8 +115,8 @@ jobs:
           python manage.py makemessages
           python manage.py concat_po_files
 
-      # Run LocalHero translation
-      - uses: localheroai/action@v1
+      # Run Localhero.ai translation
+      - uses: localheroai/localhero-action@v1
         with:
           api-key: ${{ secrets.LOCALHERO_API_KEY }}
 
@@ -131,7 +136,7 @@ The action automatically skips translation when:
 ### Custom Skip Labels
 
 ```yaml
-- uses: localheroai/action@v1
+- uses: localheroai/localhero-action@v1
   with:
     api-key: ${{ secrets.LOCALHERO_API_KEY }}
     skip-labels: 'skip-translation,wip,no-i18n'
@@ -143,21 +148,21 @@ The action automatically skips translation when:
 |---------|-------------|
 | `ci` | Auto-detects context: uses `--changed-only` on PRs, full translation on main |
 | `translate` | Translate missing keys in your i18n files |
-| `push` | Push local translations to LocalHero.ai |
-| `pull` | Pull translations from LocalHero.ai |
+| `push` | Push local translations to Localhero.ai |
+| `pull` | Pull translations from Localhero.ai |
 
 ## GitHub Integration 🔗
 
-For the best experience, connect your repository to LocalHero via the GitHub App:
+For the best experience, connect your repository to Localhero.ai via the GitHub App:
 
-1. Go to your project in [LocalHero](https://localhero.ai)
+1. Go to your project in [Localhero.ai](https://localhero.ai)
 2. Open **Project Settings** → **Connect to GitHub**
-3. Install the LocalHero GitHub App
+3. Install the Localhero.ai GitHub App
 
 This enables:
 - Automatic commits to your PRs
-- Create PRs directly from the LocalHero web UI
-- Sync translations between your repo and LocalHero
+- Create PRs directly from the Localhero.ai web UI
+- Sync translations between your repo and Localhero.ai
 
 ## Support 💬
 
