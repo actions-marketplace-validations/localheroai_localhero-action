@@ -1,5 +1,5 @@
 name: 'Localhero AI Translation'
-description: 'Translate locale files with AI on every pull request. i18n for YAML, JSON, gettext .po. Glossary and human review.'
+description: 'Lightweight TMS that lives in your pull requests. AI-translates YAML, JSON and .po files on every PR, with glossary.'
 author: 'Localhero.ai'
 branding:
   icon: 'globe'
@@ -28,6 +28,10 @@ inputs:
     description: 'Comma-separated PR labels that skip translation'
     required: false
     default: 'skip-translation'
+  working-directory:
+    description: 'Directory holding localhero.json, relative to the repository root. Set this in a monorepo where each app is its own project, e.g. "apps/web".'
+    required: false
+    default: '.'
 
 outputs:
   skipped:
@@ -49,6 +53,7 @@ runs:
         PR_DRAFT: ${{ github.event.pull_request.draft }}
         ACTOR: ${{ github.actor }}
         EVENT_NAME: ${{ github.event_name }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
       run: |
         skip_with_reason() {
           echo "skipped=true" >> $GITHUB_OUTPUT
@@ -82,7 +87,7 @@ runs:
         # We should run in sync mode. But if bot commits without syncTriggerId,
         # it's a translation commit and we should skip to prevent loops.
         if [[ "$ACTOR" == "localhero-ai[bot]" ]]; then
-          SYNC_ID=$(jq -r '.syncTriggerId // empty' localhero.json 2>/dev/null || echo "")
+          SYNC_ID=$(jq -r '.syncTriggerId // empty' "$WORKING_DIRECTORY/localhero.json" 2>/dev/null || echo "")
           if [[ -z "$SYNC_ID" ]]; then
             skip_with_reason "Bot commit without sync trigger"
           fi
@@ -130,6 +135,7 @@ runs:
     - name: Run Localhero CLI
       if: steps.skip-check.outputs.skipped != 'true'
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         LOCALHERO_API_KEY: ${{ inputs.api-key }}
         INPUT_API_HOST: ${{ inputs.api-host }}

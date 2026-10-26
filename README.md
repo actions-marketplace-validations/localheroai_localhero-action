@@ -1,6 +1,6 @@
 # Localhero GitHub Action 🌍
 
-> Translate locale files with AI in CI, on every pull request
+> A lightweight TMS that lives in your pull requests. Translates locale files with AI in CI on every PR.
 
 The official GitHub Action for [Localhero.ai](https://localhero.ai). It translates the i18n keys that changed in a PR and commits them back to the same PR, so translations stop holding up releases. It knows your glossary and brand terms, preserves ICU placeholders and plural forms, and gives your team a review UI instead of a YAML diff.
 
@@ -37,6 +37,7 @@ jobs:
         with:
           ref: ${{ github.event.client_payload.branch || github.head_ref || github.ref_name }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Translate
         uses: localheroai/localhero-action@v1
@@ -48,6 +49,8 @@ That's it! The action will automatically:
 - Fetch the base branch for comparison
 - Translate missing keys
 - Commit the changes to your PR
+
+`persist-credentials: false` makes the commit come from `localhero-ai[bot]` when the [GitHub App](https://localhero.ai/docs/github-app) is installed. Your CI then runs on that commit. Without it, git pushes with the `GITHUB_TOKEN` that checkout stored.
 
 ## Setup 🏁
 
@@ -70,6 +73,7 @@ That's it! The action will automatically:
 | `verbose` | No | `false` | Show detailed output |
 | `cli-version` | No | `latest` | Pin CLI version (e.g., `1.2.3`) |
 | `skip-labels` | No | `skip-translation` | Comma-separated PR labels that skip translation |
+| `working-directory` | No | `.` | Directory holding `localhero.json`, relative to the repository root. Set this in a monorepo. |
 
 ## Outputs
 
@@ -108,6 +112,7 @@ jobs:
         with:
           ref: ${{ github.event.client_payload.branch || github.head_ref || github.ref_name }}
           fetch-depth: 0
+          persist-credentials: false
 
       # Extract messages (project-specific)
       - name: Extract messages
@@ -132,6 +137,14 @@ The action automatically skips translation when:
 - **PR has skip label**: Add `skip-translation` label to any PR
 - **PR is a draft**: Draft PRs are skipped
 - **Bot auto-sync**: Prevents infinite loops from bot commits
+
+> **Note:** Marking a draft PR as ready for review doesn't re-run the workflow on its own — GitHub only triggers `pull_request` workflows on `opened`, `synchronize` and `reopened` by default, and re-running a skipped run reuses the original event where the PR was still a draft. Push a new commit after marking the PR ready, or add `ready_for_review` to your workflow triggers:
+>
+> ```yaml
+> on:
+>   pull_request:
+>     types: [opened, synchronize, reopened, ready_for_review]
+> ```
 
 ### Custom Skip Labels
 
@@ -173,3 +186,49 @@ This enables:
 ## License 📄
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+## Monorepos
+
+Each app is its own Localhero project with its own `localhero.json`, target
+languages and glossary. Point the action at the app with `working-directory`,
+and use a matrix to cover several apps in one workflow:
+
+```yaml
+concurrency:
+  group: translate-${{ github.event.client_payload.branch || github.head_ref || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      matrix:
+        app: [web, admin]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.client_payload.branch || github.head_ref || github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: localheroai/localhero-action@v1
+        with:
+          api-key: ${{ secrets.LOCALHERO_API_KEY }}
+          working-directory: apps/${{ matrix.app }}
+```
+
+Keep `cancel-in-progress: false` with a matrix. Each app commits its own
+translations, and that commit starts a new run; cancelling the current run would
+stop the apps that are still translating.
+
+When two apps commit at the same time, the second one replays its commit on top
+of the first (CLI 0.0.80 and later). On older CLI versions, add `max-parallel: 1`
+under `strategy` so the apps run one after another.
+
+A sync from the Localhero web app reaches every app's job. Only the app the sync
+belongs to applies it; the others print a notice and pass (CLI 0.0.79 and later).
+
+Add a `paths` filter to the workflow trigger so each app only runs when its own
+locale files change.
